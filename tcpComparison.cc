@@ -42,7 +42,6 @@ main (int argc, char *argv[])
     pointToPoint.SetChannelAttribute ("Delay", StringValue ("10ms"));
 
     PointToPointHelper bottleNeckLink;
-    bottleNeckLink.SetQueue ("ns3::DropTailQueue","MaxSize", QueueSizeValue(QueueSize (queueSize)));
     bottleNeckLink.SetDeviceAttribute ("DataRate", StringValue ("0.5Mbps"));
     bottleNeckLink.SetChannelAttribute ("Delay", StringValue ("50ms"));
 
@@ -68,7 +67,7 @@ main (int argc, char *argv[])
     sourceApps.Add (source.Install (devices.GetLeft (n)));
        }
 
-    sourceApps.Start (MilliSeconds (uv->GetValue(0.0,1000.0)));
+    sourceApps.Start (MilliSeconds (0.0));
     sourceApps.Stop (Seconds (simTime));
 
     for (uint8_t n = 0;n < 3;n++)
@@ -97,6 +96,24 @@ main (int argc, char *argv[])
     std::cout << "Bytes received by " << std::to_string(n) <<"th packetsink application: " << sink1->GetTotalRx() << std::endl;
     totalRxBytesReceived += sink1->GetTotalRx();
        }
+
+  // Creating UDP trafic
+  uint16_t udpPort = 4000;
+  UdpServerHelper server (udpPort);
+  ApplicationContainer udpServerApps = server.Install (devices.GetRight (3));
+  udpServerApps.Start (Seconds (0.0));
+  udpServerApps.Stop (Seconds (simTime));
+
+  uint32_t MaxPacketSize = 512;
+  Time interPacketInterval = MilliSeconds (500.0);
+  uint32_t maxPacketCount = 1000000;
+  UdpClientHelper client (InetSocketAddress (devices.GetRightIpv4Address (3)), udpPort);
+  client.SetAttribute ("MaxPackets", UintegerValue (maxPacketCount));
+  client.SetAttribute ("Interval", TimeValue (interPacketInterval));
+  client.SetAttribute ("PacketSize", UintegerValue (MaxPacketSize));
+  ApplicationContainer udpClientApps = client.Install (devices.GetLeft(3));
+  udpClientApps.Start (Seconds (0.0));
+  udpClientApps.Stop (Seconds (simTime));
 
     double averageThroughput = ((totalRxBytesReceived * 8) / (1e6*Simulator::Now ().GetSeconds ()));
     std::cout << "Average Throughput: " << averageThroughput << " Mbits/sec\n";
