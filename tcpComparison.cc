@@ -70,7 +70,7 @@ main (int argc, char *argv[])
     sourceApps.Start (MilliSeconds (0.0));
     sourceApps.Stop (Seconds (simTime));
 
-    for (uint8_t n = 0;n < 3;n++)
+    for (uint8_t n = 0;n <= 3;n++)
        {
     PacketSinkHelper sink ("ns3::TcpSocketFactory",InetSocketAddress (Ipv4Address::GetAny (), port));
     sinkApps.Add(sink.Install (devices.GetRight (n)));
@@ -98,22 +98,18 @@ main (int argc, char *argv[])
        }
 
   // Creating UDP trafic
-  uint16_t udpPort = 4000;
-  UdpServerHelper server (udpPort);
-  ApplicationContainer udpServerApps = server.Install (devices.GetRight (3));
-  udpServerApps.Start (Seconds (0.0));
-  udpServerApps.Stop (Seconds (simTime));
+  OnOffHelper onoff ("ns3::UdpSocketFactory", Ipv4Address::GetAny ());
+  onoff.SetAttribute ("OnTime",  StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
+  onoff.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
+  onoff.SetAttribute ("PacketSize", UintegerValue (200));
+  onoff.SetAttribute ("DataRate", StringValue ("50Mbps")); //bit/s
+  ApplicationContainer onOffApps;
 
-  uint32_t MaxPacketSize = 512;
-  Time interPacketInterval = MilliSeconds (500.0);
-  uint32_t maxPacketCount = 1000000;
-  UdpClientHelper client (InetSocketAddress (devices.GetRightIpv4Address (3)), udpPort);
-  client.SetAttribute ("MaxPackets", UintegerValue (maxPacketCount));
-  client.SetAttribute ("Interval", TimeValue (interPacketInterval));
-  client.SetAttribute ("PacketSize", UintegerValue (MaxPacketSize));
-  ApplicationContainer udpClientApps = client.Install (devices.GetLeft(3));
-  udpClientApps.Start (Seconds (0.0));
-  udpClientApps.Stop (Seconds (simTime));
+  AddressValue remoteAddress (InetSocketAddress (devices.GetRightIpv4Address(3), port));
+  onoff.SetAttribute ("Remote", remoteAddress);
+  onOffApps.Add (onoff.Install (devices.GetLeft(3)));
+  onOffApps.Start (Seconds (1.0));
+  onOffApps.Stop (Seconds (simTime));
 
     double averageThroughput = ((totalRxBytesReceived * 8) / (1e6*Simulator::Now ().GetSeconds ()));
     std::cout << "Average Throughput: " << averageThroughput << " Mbits/sec\n";
