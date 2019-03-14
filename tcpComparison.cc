@@ -32,7 +32,7 @@ using namespace ns3;
 int
 main (int argc, char *argv[])
 {
-    double simTime=5.0;
+    double simTime=50.0;
 
 
     Time::SetResolution (Time::NS);
@@ -70,12 +70,14 @@ main (int argc, char *argv[])
     sourceApps.Start (MilliSeconds (0.0));
     sourceApps.Stop (Seconds (simTime));
 
-    for (uint8_t n = 0;n <= 3;n++)
+    for (uint8_t n = 0;n < 3;n++)
        {
     PacketSinkHelper sink ("ns3::TcpSocketFactory",InetSocketAddress (Ipv4Address::GetAny (), port));
     sinkApps.Add(sink.Install (devices.GetRight (n)));
        }
 
+    PacketSinkHelper sink ("ns3::UdpSocketFactory",InetSocketAddress (Ipv4Address::GetAny (), port));
+    sinkApps.Add(sink.Install (devices.GetRight (3)));
     sinkApps.Start (Seconds (0.0));
     sinkApps.Stop (Seconds (simTime));
 
@@ -108,7 +110,7 @@ main (int argc, char *argv[])
   AddressValue remoteAddress (InetSocketAddress (devices.GetRightIpv4Address(3), port));
   onoff.SetAttribute ("Remote", remoteAddress);
   onOffApps.Add (onoff.Install (devices.GetLeft(3)));
-  onOffApps.Start (Seconds (1.0));
+  onOffApps.Start (Seconds (0.0));
   onOffApps.Stop (Seconds (simTime));
 
     double averageThroughput = ((totalRxBytesReceived * 8) / (1e6*Simulator::Now ().GetSeconds ()));
