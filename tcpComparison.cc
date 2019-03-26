@@ -39,12 +39,11 @@ CalculateThroughputA (Ptr<PacketSink> sink)
   static uint64_t lastBytesReceivedYet = 0;
   static Time lastTPrecord = Time::Min ();
   uint64_t bytesReceivedYet = sink->GetTotalRx();
-  std::cout << bytesReceivedYet << "\t" << lastBytesReceivedYet << "\t" << lastTPrecord << "\n";
+  //std::cout << bytesReceivedYet << "\t" << lastBytesReceivedYet << "\t" << lastTPrecord << "\n";
 
-  // check queue size every 1/100 of a second
   Simulator::Schedule (Seconds (1.0), &CalculateThroughputA, sink);
 
-  std::ofstream fPlotQueue (std::stringstream ("throughput-tcp.dat").str ().c_str (), std::ios::out | std::ios::app);
+  std::ofstream fPlotQueue (std::stringstream ("throughput-tcpReno.dat").str ().c_str (), std::ios::out | std::ios::app);
   fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*8.0)/1e3*(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
   fPlotQueue.close ();
   lastBytesReceivedYet=bytesReceivedYet;
@@ -59,8 +58,7 @@ CalculateThroughputB (Ptr<PacketSink> sink)
   uint64_t bytesReceivedYet = sink->GetTotalRx();
   //std::cout << bytesReceivedYet << "\t" << lastBytesReceivedYet << "\t" << lastTPrecord << "\n";
 
-  // check queue size every 1/100 of a second
-  Simulator::Schedule (Seconds (0.1), &CalculateThroughputB, sink);
+  Simulator::Schedule (Seconds (1.0), &CalculateThroughputB, sink);
 
   std::ofstream fPlotQueue (std::stringstream ("throughput-newReno.dat").str ().c_str (), std::ios::out | std::ios::app);
   fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*1.0)/(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
@@ -77,10 +75,9 @@ CalculateThroughputC (Ptr<PacketSink> sink)
   uint64_t bytesReceivedYet = sink->GetTotalRx();
   //std::cout << bytesReceivedYet << "\t" << lastBytesReceivedYet << "\t" << lastTPrecord << "\n";
 
-  // check queue size every 1/100 of a second
-  Simulator::Schedule (Seconds (0.1), &CalculateThroughputC, sink);
+  Simulator::Schedule (Seconds (1.0), &CalculateThroughputC, sink);
 
-  std::ofstream fPlotQueue (std::stringstream ("throughput-reno.dat").str ().c_str (), std::ios::out | std::ios::app);
+  std::ofstream fPlotQueue (std::stringstream ("throughput-tahoe.dat").str ().c_str (), std::ios::out | std::ios::app);
   fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*1.0)/(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
   fPlotQueue.close ();
   lastBytesReceivedYet=bytesReceivedYet;
@@ -95,10 +92,9 @@ CalculateThroughputD (Ptr<PacketSink> sink)
   uint64_t bytesReceivedYet = sink->GetTotalRx();
   //std::cout << bytesReceivedYet << "\t" << lastBytesReceivedYet << "\t" << lastTPrecord << "\n";
 
-  // check queue size every 1/100 of a second
   Simulator::Schedule (Seconds (0.1), &CalculateThroughputD, sink);
 
-  std::ofstream fPlotQueue (std::stringstream ("throughput-tahoe.dat").str ().c_str (), std::ios::out | std::ios::app);
+  std::ofstream fPlotQueue (std::stringstream ("throughput-udp.dat").str ().c_str (), std::ios::out | std::ios::app);
   fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*1.0)/(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
   fPlotQueue.close ();
   lastBytesReceivedYet=bytesReceivedYet;
@@ -173,27 +169,32 @@ main (int argc, char *argv[])
     sinkApps.Start (Seconds (0.0));
     sinkApps.Stop (Seconds (simTime));
 
-    /*TypeId tid1 = TypeId::LookupByName ("ns3::TcpReno");
+    TypeId tid1 = TypeId::LookupByName ("ns3::TcpReno");
     TypeId tid2 = TypeId::LookupByName ("ns3::TcpNewReno");
     TypeId tid3 = TypeId::LookupByName ("ns3::TcpTahoe");
     
+    //Setting bulksend nodes
     Config::Set ("/NodeList/0/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid1));
     Config::Set ("/NodeList/1/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid2));
     Config::Set ("/NodeList/2/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid3));
-    Config::Set ("/NodeList/3/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid1));
-    Config::Set ("/NodeList/4/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid2));
-    Config::Set ("/NodeList/5/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid3));*/
+    //setting packetsink nodes
+    Config::Set ("/NodeList/4/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid1));
+    Config::Set ("/NodeList/5/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid2));
+    Config::Set ("/NodeList/6/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid3));
 
 	   //creating pcap files
-    Ptr <PacketSink> sink1 = DynamicCast <PacketSink> (sinkApps.Get (0));
-    Simulator::ScheduleNow (&CalculateThroughputA, sink1);
-    //pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("pointToPoint.tr"));
-    //bottleNeckLink.EnableAsciiAll(ascii.CreateFileStream("bottleNeckLink.tr"));
-    //pointToPoint.EnablePcapAll("pointToPoint");
-    //bottleNeckLink.EnablePcapAll("bottleNeckLink");
-
+    Ptr <PacketSink> sink0 = DynamicCast <PacketSink> (sinkApps.Get (0));
+    Simulator::ScheduleNow (&CalculateThroughputA, sink0);
+    Ptr <PacketSink> sink1 = DynamicCast <PacketSink> (sinkApps.Get (1));
+    Simulator::ScheduleNow (&CalculateThroughputB, sink1);
+    Ptr <PacketSink> sink2 = DynamicCast <PacketSink> (sinkApps.Get (2));
+    Simulator::ScheduleNow (&CalculateThroughputC, sink2);
+    Ptr <PacketSink> sink3 = DynamicCast <PacketSink> (sinkApps.Get (3));
+    Simulator::ScheduleNow (&CalculateThroughputD, sink3);
+   
     Simulator::Stop (Seconds (simTime + 1.0));
     Simulator::Run ();
+
     uint64_t totalRxBytesReceived=0;
 
     for (uint8_t n = 0;n <= 3;n++)
@@ -202,8 +203,6 @@ main (int argc, char *argv[])
     std::cout << "Bytes received by " << std::to_string(n) <<"th packetsink application: " << sink1->GetTotalRx() << std::endl;
     totalRxBytesReceived += sink1->GetTotalRx();
        }
-
- 
 
     double averageThroughput = ((totalRxBytesReceived * 8) / (1e6*Simulator::Now ().GetSeconds ()));
     std::cout << "Average Throughput: " << averageThroughput << " Mbits/sec\n";
