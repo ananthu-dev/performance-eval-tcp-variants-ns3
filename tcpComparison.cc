@@ -29,25 +29,24 @@
 
 using namespace ns3;
 
-uint64_t lastBytesReceivedYet = 0;
-Time lastTPrecord = Time::Min ();
 Ptr<OutputStreamWrapper> streamWrapper;
+std::string dir = "results/";
 
 void
 CalculateThroughputA (Ptr<PacketSink> sink)
 {
   static uint64_t lastBytesReceivedYet = 0;
-  static Time lastTPrecord = Time::Min ();
+  static double lastTPrecord = 0.0;
   uint64_t bytesReceivedYet = sink->GetTotalRx();
   //std::cout << bytesReceivedYet << "\t" << lastBytesReceivedYet << "\t" << lastTPrecord << "\n";
 
   Simulator::Schedule (Seconds (1.0), &CalculateThroughputA, sink);
 
-  std::ofstream fPlotQueue (std::stringstream ("throughput-tcpReno.dat").str ().c_str (), std::ios::out | std::ios::app);
-  fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*8.0)/1e3*(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
+  std::ofstream fPlotQueue (std::stringstream (dir + "throughput-tcpReno.dat").str ().c_str (), std::ios::out | std::ios::app);
+  fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*8.0)/1e3*(Simulator::Now ().GetSeconds() - lastTPrecord) << std::endl;
   fPlotQueue.close ();
   lastBytesReceivedYet=bytesReceivedYet;
-  lastTPrecord=Simulator::Now();
+  lastTPrecord=Simulator::Now ().GetSeconds ();
 }
 
 void
@@ -60,8 +59,8 @@ CalculateThroughputB (Ptr<PacketSink> sink)
 
   Simulator::Schedule (Seconds (1.0), &CalculateThroughputB, sink);
 
-  std::ofstream fPlotQueue (std::stringstream ("throughput-newReno.dat").str ().c_str (), std::ios::out | std::ios::app);
-  fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*1.0)/(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
+  std::ofstream fPlotQueue (std::stringstream (dir + "throughput-newReno.dat").str ().c_str (), std::ios::out | std::ios::app);
+  fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*8.0)/1e3*(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
   fPlotQueue.close ();
   lastBytesReceivedYet=bytesReceivedYet;
   lastTPrecord=Simulator::Now();
@@ -77,8 +76,8 @@ CalculateThroughputC (Ptr<PacketSink> sink)
 
   Simulator::Schedule (Seconds (1.0), &CalculateThroughputC, sink);
 
-  std::ofstream fPlotQueue (std::stringstream ("throughput-tahoe.dat").str ().c_str (), std::ios::out | std::ios::app);
-  fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*1.0)/(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
+  std::ofstream fPlotQueue (std::stringstream (dir + "throughput-tahoe.dat").str ().c_str (), std::ios::out | std::ios::app);
+  fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*8.0)/1e3*(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
   fPlotQueue.close ();
   lastBytesReceivedYet=bytesReceivedYet;
   lastTPrecord=Simulator::Now();
@@ -94,18 +93,18 @@ CalculateThroughputD (Ptr<PacketSink> sink)
 
   Simulator::Schedule (Seconds (0.1), &CalculateThroughputD, sink);
 
-  std::ofstream fPlotQueue (std::stringstream ("throughput-udp.dat").str ().c_str (), std::ios::out | std::ios::app);
-  fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*1.0)/(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
+  std::ofstream fPlotQueue (std::stringstream (dir + "throughput-udp.dat").str ().c_str (), std::ios::out | std::ios::app);
+  fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*8.0)/1e3*(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
   fPlotQueue.close ();
   lastBytesReceivedYet=bytesReceivedYet;
   lastTPrecord=Simulator::Now();
 }
 
-
 int
 main (int argc, char *argv[])
 {
     double simTime=100.0;
+    bool redValue = false;
 
     Time::SetResolution (Time::NS);
 
@@ -136,6 +135,7 @@ main (int argc, char *argv[])
     BulkSendHelper source ("ns3::TcpSocketFactory", InetSocketAddress (devices.GetRightIpv4Address (n), port));
     // Set the amount of data to send in bytes.  Zero is unlimited.
     source.SetAttribute ("MaxBytes", UintegerValue (1e6));
+    source.SetAttribute ("SendSize", UintegerValue (1024));
     sourceApps.Add (source.Install (devices.GetLeft (n)));
        }
 
@@ -153,7 +153,7 @@ main (int argc, char *argv[])
   AddressValue remoteAddress (InetSocketAddress (devices.GetRightIpv4Address(3), port));
   onoff.SetAttribute ("Remote", remoteAddress);
   onOffApps.Add (onoff.Install (devices.GetLeft(3)));
-  onOffApps.Start (Seconds (80.0));
+  onOffApps.Start (Seconds (0.0));
   onOffApps.Stop (Seconds (simTime));
 
 
@@ -170,19 +170,19 @@ main (int argc, char *argv[])
     sinkApps.Stop (Seconds (simTime));
 
     TypeId tid1 = TypeId::LookupByName ("ns3::TcpReno");
-    TypeId tid2 = TypeId::LookupByName ("ns3::TcpNewReno");
     TypeId tid3 = TypeId::LookupByName ("ns3::TcpTahoe");
     
     //Setting bulksend nodes
     Config::Set ("/NodeList/0/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid1));
-    Config::Set ("/NodeList/1/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid2));
     Config::Set ("/NodeList/2/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid3));
     //setting packetsink nodes
     Config::Set ("/NodeList/4/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid1));
-    Config::Set ("/NodeList/5/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid2));
     Config::Set ("/NodeList/6/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid3));
 
-	   //creating pcap files
+    std::string dirToSave = "mkdir -p " + dir;
+    system (dirToSave.c_str ());
+
+	   
     Ptr <PacketSink> sink0 = DynamicCast <PacketSink> (sinkApps.Get (0));
     Simulator::ScheduleNow (&CalculateThroughputA, sink0);
     Ptr <PacketSink> sink1 = DynamicCast <PacketSink> (sinkApps.Get (1));
