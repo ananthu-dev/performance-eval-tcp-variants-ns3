@@ -24,6 +24,7 @@
 #include "ns3/flow-monitor-helper.h"
 #include "ns3/flow-monitor-module.h"
 #include "ns3/point-to-point-layout-module.h"
+#include "ns3/traffic-control-module.h"
 #include <string>
 
 
@@ -38,11 +39,11 @@ CalculateThroughputA (Ptr<PacketSink> sink)
   static uint64_t lastBytesReceivedYet = 0;
   static double lastTPrecord = 0.0;
   uint64_t bytesReceivedYet = sink->GetTotalRx();
-  //std::cout << bytesReceivedYet << "\t" << lastBytesReceivedYet << "\t" << lastTPrecord << "\n";
+  std::cout << bytesReceivedYet << "\t" << lastBytesReceivedYet << "\t" << lastTPrecord << "\n";
 
   Simulator::Schedule (Seconds (1.0), &CalculateThroughputA, sink);
 
-  std::ofstream fPlotQueue (std::stringstream (dir + "throughput-tcpReno.dat").str ().c_str (), std::ios::out | std::ios::app);
+  std::ofstream fPlotQueue (std::stringstream (dir + "throughput-tcpVegas.dat").str ().c_str (), std::ios::out | std::ios::app);
   fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*8.0)/1e3*(Simulator::Now ().GetSeconds() - lastTPrecord) << std::endl;
   fPlotQueue.close ();
   lastBytesReceivedYet=bytesReceivedYet;
@@ -76,7 +77,7 @@ CalculateThroughputC (Ptr<PacketSink> sink)
 
   Simulator::Schedule (Seconds (1.0), &CalculateThroughputC, sink);
 
-  std::ofstream fPlotQueue (std::stringstream (dir + "throughput-tahoe.dat").str ().c_str (), std::ios::out | std::ios::app);
+  std::ofstream fPlotQueue (std::stringstream (dir + "throughput-tcpHybla.dat").str ().c_str (), std::ios::out | std::ios::app);
   fPlotQueue << Simulator::Now ().GetSeconds () << " " << ((bytesReceivedYet - lastBytesReceivedYet)*8.0)/1e3*(Simulator::Now () - lastTPrecord).GetSeconds () << std::endl;
   fPlotQueue.close ();
   lastBytesReceivedYet=bytesReceivedYet;
@@ -100,20 +101,36 @@ CalculateThroughputD (Ptr<PacketSink> sink)
   lastTPrecord=Simulator::Now();
 }
 
+void
+ChangeQueueSize(uint16_t packets)
+{
+  Simulator::Schedule (Seconds (10.0), &ChangeQueueSize,packets + 10);
+
+  Config::SetDefault ("ns3::RedQueueDisc::MaxSize", QueueSizeValue (QueueSize (std::to_string(packets) + "p")));
+}
 int
 main (int argc, char *argv[])
 {
     double simTime=100.0;
-    bool redValue = false;
+    std::string queueDiscType= "PfifoFast";
 
     Time::SetResolution (Time::NS);
+
+    CommandLine cmd;
+    cmd.AddValue ("queueDiscType", "Set a QueueDisc", queueDiscType);
+    cmd.Parse (argc,argv);
+
+    Config::SetDefault ("ns3::RedQueueDisc::MaxSize", QueueSizeValue (QueueSize ("25p")));
+    Config::SetDefault ("ns3::PfifoFastQueueDisc::MaxSize", QueueSizeValue (QueueSize ("25p")));
 
     PointToPointHelper pointToPoint;
     pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("1Mbps"));
     pointToPoint.SetChannelAttribute ("Delay", StringValue ("10ms"));
 
+
     PointToPointHelper bottleNeckLink;
     bottleNeckLink.SetDeviceAttribute ("DataRate", StringValue ("0.5Mbps"));
+    bottleNeckLink.SetQueue ("ns3::DropTailQueue","MaxSize", QueueSizeValue(QueueSize ("25p")));
     bottleNeckLink.SetChannelAttribute ("Delay", StringValue ("50ms"));
 
     PointToPointDumbbellHelper devices (4, pointToPoint, 4, pointToPoint, bottleNeckLink);
@@ -121,11 +138,32 @@ main (int argc, char *argv[])
     InternetStackHelper stack;
     devices.InstallStack (stack);
 
+
+    if(queueDiscType == "PfifoFast")
+  {
+    TrafficControlHelper tch;
+    //default queuedisc is pfifo
+    tch.Install(devices.GetLeft()->GetDevice(0));
+    tch.Install(devices.GetRight()->GetDevice(0));
+    NS_LOG_UNCOND("PfifoFast is active");
+  }
+  //Activating RED
+  if(queueDiscType == "RED")
+  {
+  TrafficControlHelper tch;
+  tch.SetRootQueueDisc("ns3::RedQueueDisc");
+  tch.Install(devices.GetLeft()->GetDevice(0)); 
+  tch.Install(devices.GetRight()->GetDevice(0));
+  NS_LOG_UNCOND("RED is active");
+  }
+
+
     devices.AssignIpv4Addresses (Ipv4AddressHelper ("10.1.1.0", "255.255.255.0"),
                           		   Ipv4AddressHelper ("10.2.1.0", "255.255.255.0"),
                            		   Ipv4AddressHelper ("10.3.1.0", "255.255.255.0"));
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
 
     uint16_t port = 5000;
     ApplicationContainer sourceApps, sinkApps;
@@ -169,8 +207,8 @@ main (int argc, char *argv[])
     sinkApps.Start (Seconds (0.0));
     sinkApps.Stop (Seconds (simTime));
 
-    TypeId tid1 = TypeId::LookupByName ("ns3::TcpReno");
-    TypeId tid3 = TypeId::LookupByName ("ns3::TcpTahoe");
+    TypeId tid1 = TypeId::LookupByName ("ns3::TcpVegas");
+    TypeId tid3 = TypeId::LookupByName ("ns3::TcpHybla");
     
     //Setting bulksend nodes
     Config::Set ("/NodeList/0/$ns3::TcpL4Protocol/SocketType", TypeIdValue (tid1));
@@ -191,6 +229,9 @@ main (int argc, char *argv[])
     Simulator::ScheduleNow (&CalculateThroughputC, sink2);
     Ptr <PacketSink> sink3 = DynamicCast <PacketSink> (sinkApps.Get (3));
     Simulator::ScheduleNow (&CalculateThroughputD, sink3);
+
+    //uint16_t packets = 10;
+    //Simulator::ScheduleNow (&ChangeQueueSize, packets);
    
     Simulator::Stop (Seconds (simTime + 1.0));
     Simulator::Run ();
